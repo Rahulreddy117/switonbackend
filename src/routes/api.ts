@@ -58,6 +58,7 @@ const searchHandler: RequestHandler = async (req: Request, res: Response) => {
     gemini: process.env.GEMINI_API_KEY || '',
     mistral: process.env.MISTRAL_API_KEY || '',
   };
+  console.log('MISTRAL_API_KEY:', process.env.MISTRAL_API_KEY); // Log to verify
   const apiKey = apiKeys[platform.toLowerCase()];
   if (!apiKey) {
     res.status(500).json({ message: 'API key missing' });
@@ -74,7 +75,7 @@ const searchHandler: RequestHandler = async (req: Request, res: Response) => {
       body: { model: 'deepseek-coder', messages: [{ role: 'user', content: query }] },
     },
     gemini: {
-      url: 'https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=', // Adjust model
+      url: 'https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=',
       body: { contents: [{ parts: [{ text: query }] }] },
     },
     mistral: {
@@ -90,7 +91,7 @@ const searchHandler: RequestHandler = async (req: Request, res: Response) => {
   }
 
   try {
-    const response = await fetch(`${config.url}${apiKey}`, {
+    const response = await fetch(`${config.url}${apiKey}`, { // Try query parameter first
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -102,14 +103,14 @@ const searchHandler: RequestHandler = async (req: Request, res: Response) => {
       throw new Error(`API request failed with status ${response.status}: ${errorText}`);
     }
     const data = await response.json();
-    console.log('API response:', data); // Log to debug response structure
+    console.log('API response:', data); // Log to debug
     const message = platform.toLowerCase() === 'gemini'
       ? data.candidates?.[0]?.content?.parts?.[0]?.text
       : data.choices?.[0]?.message?.content || 'No response';
     if (!message) throw new Error('No valid response from API');
     res.json({ message });
-  } catch (error: unknown) { // Explicitly type as unknown
-    if (error instanceof Error) { // Type guard
+  } catch (error: unknown) {
+    if (error instanceof Error) {
       console.error(`Error fetching data from ${platform}:`, error);
       res.status(500).json({ message: `API request failed for ${platform}: ${error.message}` });
     } else {
