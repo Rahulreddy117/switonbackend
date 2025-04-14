@@ -17,7 +17,7 @@ const searchHandler: RequestHandler = async (req: Request, res: Response) => {
   // Validate required fields
   if (!platform || !query) {
     res.status(400).json({ message: 'Platform and query are required' });
-    return; // Explicit return to end the function
+    return;
   }
 
   // Handle Google Search
@@ -48,7 +48,7 @@ const searchHandler: RequestHandler = async (req: Request, res: Response) => {
       console.error('Error fetching Google results:', error);
       res.status(500).json({ message: 'Google search failed' });
     }
-    return; // Explicit return to end the function
+    return;
   }
 
   // Handle AI platforms
@@ -74,7 +74,7 @@ const searchHandler: RequestHandler = async (req: Request, res: Response) => {
       body: { model: 'deepseek-coder', messages: [{ role: 'user', content: query }] },
     },
     gemini: {
-      url: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent',
+      url: 'https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=', // Adjust model
       body: { contents: [{ parts: [{ text: query }] }] },
     },
     mistral: {
@@ -90,25 +90,32 @@ const searchHandler: RequestHandler = async (req: Request, res: Response) => {
   }
 
   try {
-    const response = await fetch(config.url, {
+    const response = await fetch(`${config.url}${apiKey}`, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(config.body),
     });
     if (!response.ok) {
-      throw new Error(`API request failed with status ${response.status}: ${await response.text()}`);
+      const errorText = await response.text();
+      throw new Error(`API request failed with status ${response.status}: ${errorText}`);
     }
     const data = await response.json();
+    console.log('API response:', data); // Log to debug response structure
     const message = platform.toLowerCase() === 'gemini'
       ? data.candidates?.[0]?.content?.parts?.[0]?.text
       : data.choices?.[0]?.message?.content || 'No response';
+    if (!message) throw new Error('No valid response from API');
     res.json({ message });
-  } catch (error) {
-    console.error(`Error fetching data from ${platform}:`, error);
-    res.status(500).json({ message: 'API request failed' });
+  } catch (error: unknown) { // Explicitly type as unknown
+    if (error instanceof Error) { // Type guard
+      console.error(`Error fetching data from ${platform}:`, error);
+      res.status(500).json({ message: `API request failed for ${platform}: ${error.message}` });
+    } else {
+      console.error(`Unexpected error from ${platform}:`, error);
+      res.status(500).json({ message: `API request failed for ${platform}: Unknown error` });
+    }
   }
 };
 
