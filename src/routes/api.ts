@@ -17,7 +17,7 @@ const searchHandler: RequestHandler = async (req: Request, res: Response) => {
   // Validate required fields
   if (!platform || !query) {
     res.status(400).json({ message: 'Platform and query are required' });
-    return; // Explicit return to end the function
+    return;
   }
 
   // Handle Google Search
@@ -48,7 +48,7 @@ const searchHandler: RequestHandler = async (req: Request, res: Response) => {
       console.error('Error fetching Google results:', error);
       res.status(500).json({ message: 'Google search failed' });
     }
-    return; // Explicit return to end the function
+    return;
   }
 
   // Handle AI platforms
@@ -58,6 +58,7 @@ const searchHandler: RequestHandler = async (req: Request, res: Response) => {
     gemini: process.env.GEMINI_API_KEY || '',
     mistral: process.env.MISTRAL_API_KEY || '',
   };
+  console.log('MISTRAL_API_KEY:', process.env.MISTRAL_API_KEY); // Log to verify
   const apiKey = apiKeys[platform.toLowerCase()];
   if (!apiKey) {
     res.status(500).json({ message: 'API key missing' });
@@ -90,25 +91,32 @@ const searchHandler: RequestHandler = async (req: Request, res: Response) => {
   }
 
   try {
-    const response = await fetch(config.url, {
+    const response = await fetch(`${config.url}${apiKey}`, { // Try query parameter first
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(config.body),
     });
     if (!response.ok) {
-      throw new Error(`API request failed with status ${response.status}: ${await response.text()}`);
+      const errorText = await response.text();
+      throw new Error(`API request failed with status ${response.status}: ${errorText}`);
     }
     const data = await response.json();
+    console.log('API response:', data); // Log to debug
     const message = platform.toLowerCase() === 'gemini'
       ? data.candidates?.[0]?.content?.parts?.[0]?.text
       : data.choices?.[0]?.message?.content || 'No response';
+    if (!message) throw new Error('No valid response from API');
     res.json({ message });
-  } catch (error) {
-    console.error(`Error fetching data from ${platform}:`, error);
-    res.status(500).json({ message: 'API request failed' });
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      console.error(`Error fetching data from ${platform}:`, error);
+      res.status(500).json({ message: `API request failed for ${platform}: ${error.message}` });
+    } else {
+      console.error(`Unexpected error from ${platform}:`, error);
+      res.status(500).json({ message: `API request failed for ${platform}: Unknown error` });
+    }
   }
 };
 
