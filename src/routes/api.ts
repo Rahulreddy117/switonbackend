@@ -65,22 +65,26 @@ const searchHandler: RequestHandler = async (req: Request, res: Response) => {
     return;
   }
 
-  const apiConfigs: { [key: string]: { url: string; body: any } } = {
+  const apiConfigs: { [key: string]: { url: string; body: any; useBearer?: boolean } } = {
     chatgpt: {
       url: 'https://api.openai.com/v1/chat/completions',
       body: { model: 'gpt-3.5-turbo', messages: [{ role: 'user', content: query }] },
+      useBearer: true,
     },
     deepseek: {
       url: 'https://api.deepseek.com/v1/chat/completions',
       body: { model: 'deepseek-coder', messages: [{ role: 'user', content: query }] },
+      useBearer: true,
     },
     gemini: {
-      url: 'https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=',
+      url: 'https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent',
       body: { contents: [{ parts: [{ text: query }] }] },
+      useBearer: false,
     },
     mistral: {
       url: 'https://api.mistral.ai/v1/chat/completions',
       body: { model: 'mistral-large-latest', messages: [{ role: 'user', content: query }] },
+      useBearer: true,
     },
   };
 
@@ -91,13 +95,26 @@ const searchHandler: RequestHandler = async (req: Request, res: Response) => {
   }
 
   try {
-    const response = await fetch(`${config.url}${apiKey}`, { // Try query parameter first
+    // Dynamically construct the URL based on authentication method
+    const url = config.useBearer ? config.url : `${config.url}?key=${apiKey}`;
+
+    const fetchOptions: RequestInit = {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(config.body),
-    });
+    };
+
+    // Add Authorization header for platforms using Bearer token
+    if (config.useBearer) {
+      fetchOptions.headers = {
+        ...fetchOptions.headers,
+        Authorization: `Bearer ${apiKey}`,
+      };
+    }
+
+    const response = await fetch(url, fetchOptions);
     if (!response.ok) {
       const errorText = await response.text();
       throw new Error(`API request failed with status ${response.status}: ${errorText}`);
