@@ -3,20 +3,24 @@ import { AIRequest, AIResponse, GoogleResult } from '../types';
 
 const router: Router = express.Router();
 
+// Explicitly type the async handler as RequestHandler with appropriate generics
 const searchHandler: RequestHandler = async (req: Request, res: Response) => {
   console.log('Received request:', req.body);
 
+  // Safely handle req.body
   const body: Partial<AIRequest> = req.body || {};
   const { platform, query }: AIRequest = {
     platform: body.platform || '',
     query: body.query || '',
   };
 
+  // Validate required fields
   if (!platform || !query) {
     res.status(400).json({ message: 'Platform and query are required' });
     return;
   }
 
+  // Handle Google Search
   if (platform.toLowerCase() === 'google') {
     const apiKey = process.env.GOOGLE_API_KEY;
     const cseId = process.env.GOOGLE_CSE_ID;
@@ -47,13 +51,14 @@ const searchHandler: RequestHandler = async (req: Request, res: Response) => {
     return;
   }
 
+  // Handle AI platforms
   const apiKeys: { [key: string]: string } = {
     chatgpt: process.env.CHATGPT_API_KEY || '',
     deepseek: process.env.DEEPSEEK_API_KEY || '',
     gemini: process.env.GEMINI_API_KEY || '',
     mistral: process.env.MISTRAL_API_KEY || '',
   };
-
+  console.log('MISTRAL_API_KEY:', process.env.MISTRAL_API_KEY); // Log to verify
   const apiKey = apiKeys[platform.toLowerCase()];
   if (!apiKey) {
     res.status(500).json({ message: 'API key missing' });
@@ -62,16 +67,13 @@ const searchHandler: RequestHandler = async (req: Request, res: Response) => {
 
   const apiConfigs: { [key: string]: { url: string; body: any; useBearer?: boolean } } = {
     chatgpt: {
-      url: 'https://api.openai.com/v1/chat/completions',
+      url: 'https://api.openai.com/v1/chat/completions',             
       body: { model: 'gpt-3.5-turbo', messages: [{ role: 'user', content: query }] },
       useBearer: true,
     },
     deepseek: {
-      url: 'https://openrouter.ai/api/v1/chat/completions', // OpenRouter endpoint
-      body: {
-        model: 'deepseek/deepseek-chat', // Correct model name for DeepSeek via OpenRouter
-        messages: [{ role: 'user', content: query }],
-      },
+      url: 'https://api.deepseek.com/v1/chat/completions',
+      body: { model: 'deepseek-coder', messages: [{ role: 'user', content: query }] },
       useBearer: true,
     },
     gemini: {
@@ -93,6 +95,7 @@ const searchHandler: RequestHandler = async (req: Request, res: Response) => {
   }
 
   try {
+    // Dynamically construct the URL based on authentication method
     const url = config.useBearer ? config.url : `${config.url}?key=${apiKey}`;
 
     const fetchOptions: RequestInit = {
@@ -103,6 +106,7 @@ const searchHandler: RequestHandler = async (req: Request, res: Response) => {
       body: JSON.stringify(config.body),
     };
 
+    // Add Authorization header for platforms using Bearer token
     if (config.useBearer) {
       fetchOptions.headers = {
         ...fetchOptions.headers,
@@ -115,16 +119,12 @@ const searchHandler: RequestHandler = async (req: Request, res: Response) => {
       const errorText = await response.text();
       throw new Error(`API request failed with status ${response.status}: ${errorText}`);
     }
-
     const data = await response.json();
-    console.log('API response:', data);
-
+    console.log('API response:', data); // Log to debug
     const message = platform.toLowerCase() === 'gemini'
       ? data.candidates?.[0]?.content?.parts?.[0]?.text
       : data.choices?.[0]?.message?.content || 'No response';
-
     if (!message) throw new Error('No valid response from API');
-
     res.json({ message });
   } catch (error: unknown) {
     if (error instanceof Error) {
@@ -137,5 +137,7 @@ const searchHandler: RequestHandler = async (req: Request, res: Response) => {
   }
 };
 
+// Assign the typed handler to router.post
 router.post('/search', searchHandler);
+
 export default router;
