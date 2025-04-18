@@ -3,25 +3,20 @@ import { AIRequest, AIResponse, GoogleResult } from '../types';
 
 const router: Router = express.Router();
 
-// Explicitly type the async handler as RequestHandler with appropriate generics
 const searchHandler: RequestHandler = async (req: Request, res: Response) => {
   console.log('Received request:', req.body);
 
-  // Safely handle req.body
   const body: Partial<AIRequest> = req.body || {};
-
   const { platform, query }: AIRequest = {
     platform: body.platform || '',
     query: body.query || '',
   };
 
-  // Validate required fields
   if (!platform || !query) {
     res.status(400).json({ message: 'Platform and query are required' });
     return;
   }
 
-  // Handle Google Search
   if (platform.toLowerCase() === 'google') {
     const apiKey = process.env.GOOGLE_API_KEY;
     const cseId = process.env.GOOGLE_CSE_ID;
@@ -39,12 +34,11 @@ const searchHandler: RequestHandler = async (req: Request, res: Response) => {
         throw new Error(`Google API request failed with status ${response.status}: ${await response.text()}`);
       }
       const data = await response.json();
-      const results: GoogleResult[] =
-        data.items?.map((item: any) => ({
-          title: item.title,
-          link: item.link,
-          snippet: item.snippet,
-        })) || [];
+      const results: GoogleResult[] = data.items?.map((item: any) => ({
+        title: item.title,
+        link: item.link,
+        snippet: item.snippet,
+      })) || [];
       res.json({ results });
     } catch (error) {
       console.error('Error fetching Google results:', error);
@@ -53,14 +47,13 @@ const searchHandler: RequestHandler = async (req: Request, res: Response) => {
     return;
   }
 
-  // Handle AI platforms
   const apiKeys: { [key: string]: string } = {
     chatgpt: process.env.CHATGPT_API_KEY || '',
     deepseek: process.env.DEEPSEEK_API_KEY || '',
     gemini: process.env.GEMINI_API_KEY || '',
     mistral: process.env.MISTRAL_API_KEY || '',
   };
-  console.log('MISTRAL_API_KEY:', process.env.MISTRAL_API_KEY); // Log to verify
+  console.log('MISTRAL_API_KEY:', process.env.MISTRAL_API_KEY);
   const apiKey = apiKeys[platform.toLowerCase()];
   if (!apiKey) {
     res.status(500).json({ message: 'API key missing' });
@@ -70,33 +63,22 @@ const searchHandler: RequestHandler = async (req: Request, res: Response) => {
   const apiConfigs: { [key: string]: { url: string; body: any; useBearer?: boolean } } = {
     chatgpt: {
       url: 'https://api.mistral.ai/v1/chat/completions',
-      body: {
-        model: 'mistral-large-latest',
-        messages: [{ role: 'user', content: query }],
-      },
+      body: { model: 'mistral-large-latest', messages: [{ role: 'user', content: query }] },
       useBearer: true,
     },
     deepseek: {
-      url: 'https://openrouter.ai/api/v1/chat/completions',
-      body: {
-        model: 'deepseek-chat',
-        messages: [{ role: 'user', content: query }],
-      },
+      url: 'https://api.deepseek.com/v1/chat/completions',
+      body: { model: 'deepseek-coder', messages: [{ role: 'user', content: query }] },
       useBearer: true,
     },
     gemini: {
       url: 'https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent',
-      body: {
-        contents: [{ parts: [{ text: query }] }],
-      },
+      body: { contents: [{ parts: [{ text: query }] }] },
       useBearer: false,
     },
     mistral: {
       url: 'https://api.mistral.ai/v1/chat/completions',
-      body: {
-        model: 'mistral-large-latest',
-        messages: [{ role: 'user', content: query }],
-      },
+      body: { model: 'mistral-large-latest', messages: [{ role: 'user', content: query }] },
       useBearer: true,
     },
   };
@@ -132,12 +114,9 @@ const searchHandler: RequestHandler = async (req: Request, res: Response) => {
     }
     const data = await response.json();
     console.log('API response:', data);
-
-    const message =
-      platform.toLowerCase() === 'gemini'
-        ? data.candidates?.[0]?.content?.parts?.[0]?.text
-        : data.choices?.[0]?.message?.content || 'No response';
-
+    const message = platform.toLowerCase() === 'gemini'
+      ? data.candidates?.[0]?.content?.parts?.[0]?.text
+      : data.choices?.[0]?.message?.content || 'No response';
     if (!message) throw new Error('No valid response from API');
     res.json({ message });
   } catch (error: unknown) {
@@ -152,5 +131,4 @@ const searchHandler: RequestHandler = async (req: Request, res: Response) => {
 };
 
 router.post('/search', searchHandler);
-
 export default router;
