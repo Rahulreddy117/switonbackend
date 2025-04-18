@@ -1,5 +1,5 @@
 import express, { Request, Response, Router, RequestHandler } from 'express';
-import { AIRequest, GoogleResult } from '../types';
+import { AIRequest, AIResponse, GoogleResult } from '../types';
 
 const router: Router = express.Router();
 
@@ -42,7 +42,7 @@ const searchHandler: RequestHandler = async (req: Request, res: Response) => {
       res.json({ results });
     } catch (error) {
       console.error('Error fetching Google results:', error);
-      res.status(500).json({ message: 'High Demand. Try using a different platform.' });
+      res.status(500).json({ message: 'Google search failed' });
     }
     return;
   }
@@ -62,14 +62,14 @@ const searchHandler: RequestHandler = async (req: Request, res: Response) => {
 
   const apiConfigs: { [key: string]: { url: string; body: any; useBearer?: boolean } } = {
     chatgpt: {
-      url: 'https://api.openai.com/v1/chat/completions',
-      body: { model: 'gpt-3.5-turbo', messages: [{ role: 'user', content: query }] },
+      url: 'https://api.mistral.ai/v1/chat/completions',
+      body: { model: 'mistral-large-latest', messages: [{ role: 'user', content: query }] },
       useBearer: true,
     },
     deepseek: {
-      url: 'https://openrouter.ai/api/v1/chat/completions',
+      url: 'https://openrouter.ai/api/v1/chat/completions', // OpenRouter endpoint
       body: {
-        model: 'deepseek-chat',
+        model: 'deepseek-chat', // Correct model name for DeepSeek via OpenRouter
         messages: [{ role: 'user', content: query }],
       },
       useBearer: true,
@@ -112,7 +112,8 @@ const searchHandler: RequestHandler = async (req: Request, res: Response) => {
 
     const response = await fetch(url, fetchOptions);
     if (!response.ok) {
-      throw new Error(await response.text());
+      const errorText = await response.text();
+      throw new Error(`API request failed with status ${response.status}: ${errorText}`);
     }
 
     const data = await response.json();
@@ -126,8 +127,13 @@ const searchHandler: RequestHandler = async (req: Request, res: Response) => {
 
     res.json({ message });
   } catch (error: unknown) {
-    console.error(`Error fetching data from ${platform}:`, error);
-    res.status(500).json({ message: 'High Demand. Try using a different platform.' });
+    if (error instanceof Error) {
+      console.error(`Error fetching data from ${platform}:`, error);
+      res.status(500).json({ message: `API request failed for ${platform}: ${error.message}` });
+    } else {
+      console.error(`Unexpected error from ${platform}:`, error);
+      res.status(500).json({ message: `High Demand. Try usinga different platform :` });
+    }
   }
 };
 
