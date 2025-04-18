@@ -67,8 +67,8 @@ const searchHandler: RequestHandler = async (req: Request, res: Response) => {
 
   const apiConfigs: { [key: string]: { url: string; body: any; useBearer?: boolean } } = {
     chatgpt: {
-      url: 'https://api.openai.com/v1/chat/completions',             
-      body: { model: 'gpt-3.5-turbo', messages: [{ role: 'user', content: query }] },
+      url: 'https://api.mistral.ai/v1/chat/completions',             
+      body: { model: 'mistral-large-latest', messages: [{ role: 'user', content: query }] },
       useBearer: true,
     },
     deepseek: {
@@ -140,4 +140,4 @@ const searchHandler: RequestHandler = async (req: Request, res: Response) => {
 // Assign the typed handler to router.post
 router.post('/search', searchHandler);
 
-export default router;
+export default router;   
