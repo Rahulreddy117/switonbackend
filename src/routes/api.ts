@@ -9,6 +9,7 @@ const searchHandler: RequestHandler = async (req: Request, res: Response) => {
 
   // Safely handle req.body
   const body: Partial<AIRequest> = req.body || {};
+
   const { platform, query }: AIRequest = {
     platform: body.platform || '',
     query: body.query || '',
@@ -38,11 +39,12 @@ const searchHandler: RequestHandler = async (req: Request, res: Response) => {
         throw new Error(`Google API request failed with status ${response.status}: ${await response.text()}`);
       }
       const data = await response.json();
-      const results: GoogleResult[] = data.items?.map((item: any) => ({
-        title: item.title,
-        link: item.link,
-        snippet: item.snippet,
-      })) || [];
+      const results: GoogleResult[] =
+        data.items?.map((item: any) => ({
+          title: item.title,
+          link: item.link,
+          snippet: item.snippet,
+        })) || [];
       res.json({ results });
     } catch (error) {
       console.error('Error fetching Google results:', error);
@@ -67,24 +69,34 @@ const searchHandler: RequestHandler = async (req: Request, res: Response) => {
 
   const apiConfigs: { [key: string]: { url: string; body: any; useBearer?: boolean } } = {
     chatgpt: {
-      url: 'https://api.mistral.ai/v1/chat/completions',             
-      body: { model: 'mistral-large-latest', messages: [{ role: 'user', content: query }] },
+      url: 'https://api.mistral.ai/v1/chat/completions',
+      body: {
+        model: 'mistral-large-latest',
+        messages: [{ role: 'user', content: query }],
+      },
       useBearer: true,
     },
     deepseek: {
       url: 'https://openrouter.ai/api/v1/chat/completions',
-      body: { model: 'deepseek-chat', messages: [{ role: 'user', content: query }] },   
-      
+      body: {
+        model: 'deepseek-chat',
+        messages: [{ role: 'user', content: query }],
+      },
       useBearer: true,
     },
     gemini: {
       url: 'https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent',
-      body: { contents: [{ parts: [{ text: query }] }] },
+      body: {
+        contents: [{ parts: [{ text: query }] }],
+      },
       useBearer: false,
     },
     mistral: {
       url: 'https://api.mistral.ai/v1/chat/completions',
-      body: { model: 'mistral-large-latest', messages: [{ role: 'user', content: query }] },
+      body: {
+        model: 'mistral-large-latest',
+        messages: [{ role: 'user', content: query }],
+      },
       useBearer: true,
     },
   };
@@ -96,7 +108,6 @@ const searchHandler: RequestHandler = async (req: Request, res: Response) => {
   }
 
   try {
-    // Dynamically construct the URL based on authentication method
     const url = config.useBearer ? config.url : `${config.url}?key=${apiKey}`;
 
     const fetchOptions: RequestInit = {
@@ -107,7 +118,6 @@ const searchHandler: RequestHandler = async (req: Request, res: Response) => {
       body: JSON.stringify(config.body),
     };
 
-    // Add Authorization header for platforms using Bearer token
     if (config.useBearer) {
       fetchOptions.headers = {
         ...fetchOptions.headers,
@@ -121,10 +131,13 @@ const searchHandler: RequestHandler = async (req: Request, res: Response) => {
       throw new Error(`API request failed with status ${response.status}: ${errorText}`);
     }
     const data = await response.json();
-    console.log('API response:', data); // Log to debug
-    const message = platform.toLowerCase() === 'gemini'
-      ? data.candidates?.[0]?.content?.parts?.[0]?.text
-      : data.choices?.[0]?.message?.content || 'No response';
+    console.log('API response:', data);
+
+    const message =
+      platform.toLowerCase() === 'gemini'
+        ? data.candidates?.[0]?.content?.parts?.[0]?.text
+        : data.choices?.[0]?.message?.content || 'No response';
+
     if (!message) throw new Error('No valid response from API');
     res.json({ message });
   } catch (error: unknown) {
@@ -138,7 +151,6 @@ const searchHandler: RequestHandler = async (req: Request, res: Response) => {
   }
 };
 
-// Assign the typed handler to router.post
 router.post('/search', searchHandler);
 
-export default router;   
+export default router;
