@@ -1,5 +1,5 @@
 import express, { Request, Response, Router, RequestHandler } from 'express';
-import { AIRequest, AIResponse, GoogleResult } from '../types';
+import { AIRequest, GoogleResult } from '../types';
 
 const router: Router = express.Router();
 
@@ -42,7 +42,7 @@ const searchHandler: RequestHandler = async (req: Request, res: Response) => {
       res.json({ results });
     } catch (error) {
       console.error('Error fetching Google results:', error);
-      res.status(500).json({ message: 'Google search failed' });
+      res.status(500).json({ message: 'High Demand. Try using a different platform.' });
     }
     return;
   }
@@ -53,7 +53,7 @@ const searchHandler: RequestHandler = async (req: Request, res: Response) => {
     gemini: process.env.GEMINI_API_KEY || '',
     mistral: process.env.MISTRAL_API_KEY || '',
   };
-  console.log('MISTRAL_API_KEY:', process.env.MISTRAL_API_KEY);
+
   const apiKey = apiKeys[platform.toLowerCase()];
   if (!apiKey) {
     res.status(500).json({ message: 'API key missing' });
@@ -62,13 +62,16 @@ const searchHandler: RequestHandler = async (req: Request, res: Response) => {
 
   const apiConfigs: { [key: string]: { url: string; body: any; useBearer?: boolean } } = {
     chatgpt: {
-      url: 'https://api.mistral.ai/v1/chat/completions',
-      body: { model: 'mistral-large-latest', messages: [{ role: 'user', content: query }] },
+      url: 'https://api.openai.com/v1/chat/completions',
+      body: { model: 'gpt-3.5-turbo', messages: [{ role: 'user', content: query }] },
       useBearer: true,
     },
     deepseek: {
-      url: 'https://api.deepseek.com/v1/chat/completions',
-      body: { model: 'deepseek-coder', messages: [{ role: 'user', content: query }] },
+      url: 'https://openrouter.ai/api/v1/chat/completions',
+      body: {
+        model: 'deepseek-chat',
+        messages: [{ role: 'user', content: query }],
+      },
       useBearer: true,
     },
     gemini: {
@@ -109,24 +112,22 @@ const searchHandler: RequestHandler = async (req: Request, res: Response) => {
 
     const response = await fetch(url, fetchOptions);
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`API request failed with status ${response.status}: ${errorText}`);
+      throw new Error(await response.text());
     }
+
     const data = await response.json();
     console.log('API response:', data);
+
     const message = platform.toLowerCase() === 'gemini'
       ? data.candidates?.[0]?.content?.parts?.[0]?.text
       : data.choices?.[0]?.message?.content || 'No response';
+
     if (!message) throw new Error('No valid response from API');
+
     res.json({ message });
   } catch (error: unknown) {
-    if (error instanceof Error) {
-      console.error(`Error fetching data from ${platform}:`, error);
-      res.status(500).json({ message: `API request failed for ${platform}: ${error.message}` });
-    } else {
-      console.error(`Unexpected error from ${platform}:`, error);
-      res.status(500).json({ message: `API request failed for ${platform}: Unknown error` });
-    }
+    console.error(`Error fetching data from ${platform}:`, error);
+    res.status(500).json({ message: 'High Demand. Try using a different platform.' });
   }
 };
 
