@@ -72,8 +72,9 @@ const searchHandler: RequestHandler = async (req: Request, res: Response) => {
       useBearer: true,
     },
     deepseek: {
-      url: 'https://api.deepseek.com/v1/chat/completions',
-      body: { model: 'deepseek-coder', messages: [{ role: 'user', content: query }] },
+      url: 'https://openrouter.ai/api/v1/chat/completions',
+      body: { model: 'deepseek-chat', messages: [{ role: 'user', content: query }] },   
+      
       useBearer: true,
     },
     gemini: {
